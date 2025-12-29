@@ -8,8 +8,8 @@ import { StoryPreview } from './components/StoryPreview';
 import { ChatBot } from './components/ChatBot';
 import { Checkout } from './components/Checkout';
 import { AppState, ChildInfo, StoryBook } from './types';
-import { generatePersonalizedStory } from './services/geminiService';
-import { Sparkles, CheckCircle } from 'lucide-react';
+import { createStoryBookAPI } from './services/geminiService';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [state, setState] = useState<AppState>('home');
@@ -18,24 +18,23 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  useEffect(() => {
-    console.log("StoryMagic App successfully mounted ✨");
-  }, []);
-
   const handleStart = () => setState('form');
   
   const handleFormSubmit = async (info: ChildInfo) => {
-    setChildInfo(info);
     setState('loading');
     setError(null);
     
     try {
-      const generatedStory = await generatePersonalizedStory(info);
-      setStory(generatedStory);
+      // Calling our Next.js style "Backend" handler
+      const result = await createStoryBookAPI(info);
+      
+      // Update local state with the final results (including transformed avatar)
+      setChildInfo({ ...info, magicAvatar: (result as any).magicAvatar });
+      setStory(result);
       setState('preview');
-    } catch (err) {
-      console.error("Story generation error:", err);
-      setError("The magic spell fizzled out! Please check your connection and try again.");
+    } catch (err: any) {
+      console.error("Backend Process Error:", err);
+      setError(err.message || "Something went wrong with the magic. Please try again!");
       setState('form');
     }
   };
@@ -50,7 +49,6 @@ export default function App() {
   const handleCheckoutSuccess = () => {
     setShowSuccess(true);
     setState('home');
-    // Hide success message after 5 seconds
     setTimeout(() => setShowSuccess(false), 5000);
   };
 
@@ -61,7 +59,7 @@ export default function App() {
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4">
             <div className="bg-green-500 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3">
               <CheckCircle className="w-6 h-6" />
-              <span className="font-bold">Magic Order Received! Check your email. ✨</span>
+              <span className="font-bold">Magic Order Received! ✨</span>
             </div>
           </div>
         )}
@@ -71,7 +69,8 @@ export default function App() {
         {state === 'form' && (
           <div className="space-y-4">
             {error && (
-              <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-3xl text-center font-bold">
+              <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-3xl flex items-center justify-center gap-3 font-bold">
+                <AlertCircle className="w-5 h-5" />
                 {error}
               </div>
             )}

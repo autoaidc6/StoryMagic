@@ -28,7 +28,8 @@ export const ChatBot: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const response = await getChatResponse(userMessage, []); // In a real app, pass mapped history
+      // Fixed: getChatResponse expects 1 argument (the message string).
+      const response = await getChatResponse(userMessage); 
       setChatHistory(prev => [...prev, { role: 'bot', text: response }]);
     } catch (error) {
       setChatHistory(prev => [...prev, { role: 'bot', text: "Oops! My magic wand is a bit tired. Try again later! 🪄" }]);
