@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { ChildInfo, StoryBook } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safe helper to initialize the AI client
+const getAI = () => {
+  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
 
 export async function generatePersonalizedStory(info: ChildInfo): Promise<StoryBook> {
+  const ai = getAI();
   const prompt = `Create a magical 10-page children's adventure story for a ${info.gender} named ${info.name}. 
   The theme should be 'The Starry Key Quest'. 
   Include 2-3 fun, real-world educational facts about stars or space integrated into the story.
@@ -13,7 +18,6 @@ export async function generatePersonalizedStory(info: ChildInfo): Promise<StoryB
   - title: A catchy book title.
   - pages: Array of 10 objects, each with 'pageNumber', 'content' (max 3 sentences), and 'illustrationPrompt' (a descriptive scene for an illustrator).`;
 
-  // We use googleSearch to fulfill the request for real-world educational facts.
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
@@ -42,7 +46,6 @@ export async function generatePersonalizedStory(info: ChildInfo): Promise<StoryB
     }
   });
 
-  // Extract grounding chunks for the required web UI display
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
   const sources = groundingChunks?.map((chunk: any) => {
     if (chunk.web) {
@@ -52,9 +55,7 @@ export async function generatePersonalizedStory(info: ChildInfo): Promise<StoryB
   }).filter((s: any): s is { uri: string; title: string } => !!s && !!s.uri) || [];
 
   try {
-    // Correctly accessing text as a property
     const text = response.text || '{}';
-    // Clean potential markdown formatting
     const cleanJson = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
     const json = JSON.parse(cleanJson);
     return { ...json, sources } as StoryBook;
@@ -65,6 +66,7 @@ export async function generatePersonalizedStory(info: ChildInfo): Promise<StoryB
 }
 
 export async function getChatResponse(message: string, history: { role: string, parts: string }[]) {
+  const ai = getAI();
   const chat = ai.chats.create({
     model: 'gemini-3-pro-preview',
     config: {
@@ -72,8 +74,6 @@ export async function getChatResponse(message: string, history: { role: string, 
     },
   });
 
-  // chat.sendMessage only accepts the message parameter
   const response = await chat.sendMessage({ message });
-  // response.text is a property, not a method
   return response.text || "I'm sorry, I'm having trouble thinking of what to say. ✨";
 }
