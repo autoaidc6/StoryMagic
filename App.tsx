@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Layout } from './components/Layout';
 import { Hero } from './components/Hero';
 import { StoryForm } from './components/StoryForm';
@@ -7,6 +7,8 @@ import { Loader } from './components/Loader';
 import { StoryPreview } from './components/StoryPreview';
 import { ChatBot } from './components/ChatBot';
 import { Checkout } from './components/Checkout';
+import { HowItWorks } from './components/HowItWorks';
+import { Pricing } from './components/Pricing';
 import { AppState, ChildInfo, StoryBook } from './types';
 import { createStoryBookAPI } from './services/geminiService';
 import { CheckCircle, AlertCircle } from 'lucide-react';
@@ -25,10 +27,7 @@ export default function App() {
     setError(null);
     
     try {
-      // Calling our Next.js style "Backend" handler
       const result = await createStoryBookAPI(info);
-      
-      // Update local state with the final results (including transformed avatar)
       setChildInfo({ ...info, magicAvatar: (result as any).magicAvatar });
       setStory(result);
       setState('preview');
@@ -52,9 +51,14 @@ export default function App() {
     setTimeout(() => setShowSuccess(false), 5000);
   };
 
+  const handleNavigate = (page: 'home' | 'how-it-works' | 'pricing') => {
+    setError(null);
+    setState(page);
+  };
+
   return (
-    <Layout>
-      <div className="animate-in fade-in duration-1000 relative">
+    <Layout onNavigate={handleNavigate}>
+      <div className="animate-in fade-in duration-1000 relative min-h-[60vh]">
         {showSuccess && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4">
             <div className="bg-green-500 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3">
@@ -66,6 +70,10 @@ export default function App() {
 
         {state === 'home' && <Hero onStart={handleStart} />}
         
+        {state === 'how-it-works' && <HowItWorks onStart={handleStart} />}
+        
+        {state === 'pricing' && <Pricing onStart={handleStart} />}
+
         {state === 'form' && (
           <div className="space-y-4">
             {error && (

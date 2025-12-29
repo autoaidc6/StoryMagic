@@ -19,4 +19,4 @@ export interface StoryBook {
   sources?: { uri: string; title: string }[];
 }
 
-export type AppState = 'home' | 'form' | 'loading' | 'preview' | 'checkout';
+export type AppState = 'home' | 'form' | 'loading' | 'preview' | 'checkout' | 'how-it-works' | 'pricing';
