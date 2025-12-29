@@ -23,9 +23,10 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
 
   const isCover = currentPage === 0;
 
-  // Helper to inject name dynamically
+  // Helper to inject name dynamically using the new {{child_name}} placeholder
   const injectName = (text: string) => {
-    return text.replace(/{NAME}/g, child.name);
+    if (!text) return "";
+    return text.replace(/{{child_name}}/g, child.name);
   };
 
   return (
@@ -85,7 +86,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
                       )}
                    </div>
                    <div className="text-[10px] text-slate-300 italic text-center">
-                      Scene Prompt: {book.pages[currentPage - 1].illustrationPrompt}
+                      Scene Prompt: {book.pages[currentPage - 1].visual_prompt}
                    </div>
                 </div>
              )}
@@ -116,7 +117,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
               ) : (
                 <div className="space-y-6">
                    <p className="text-2xl text-slate-700 leading-relaxed font-medium">
-                     {injectName(book.pages[currentPage - 1].content)}
+                     {injectName(book.pages[currentPage - 1].text)}
                    </p>
                 </div>
               )}

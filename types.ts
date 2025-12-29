@@ -7,9 +7,9 @@ export interface ChildInfo {
 }
 
 export interface StoryPage {
-  pageNumber: number;
-  content: string;
-  illustrationPrompt: string;
+  page: number;
+  text: string;
+  visual_prompt: string;
   imageUrl?: string;
 }
 
