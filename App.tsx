@@ -14,34 +14,10 @@ export default function App() {
   const [childInfo, setChildInfo] = useState<ChildInfo | null>(null);
   const [story, setStory] = useState<StoryBook | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasRuntimeError, setHasRuntimeError] = useState(false);
 
-  // Catch unhandled errors that might cause a blank screen
   useEffect(() => {
-    const handleError = (e: ErrorEvent) => {
-      console.error("Runtime Magic Error:", e.error);
-      setHasRuntimeError(true);
-    };
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
+    console.log("StoryMagic App successfully mounted ✨");
   }, []);
-
-  if (hasRuntimeError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-indigo-50 p-6 text-center">
-        <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md border-4 border-white">
-          <h1 className="text-4xl font-bubblegum text-indigo-600 mb-4">Oh Sparkles!</h1>
-          <p className="text-slate-600 mb-8 font-medium">The magic encountered a little hiccup. Please try refreshing the page!</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const handleStart = () => setState('form');
   
@@ -55,7 +31,7 @@ export default function App() {
       setStory(generatedStory);
       setState('preview');
     } catch (err) {
-      console.error(err);
+      console.error("Story generation error:", err);
       setError("The magic spell fizzled out! Please check your connection and try again.");
       setState('form');
     }
