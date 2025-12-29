@@ -28,6 +28,7 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
     throw new Error("API Key is missing. Please ensure your environment is configured correctly.");
   }
 
+  // Always create a fresh instance
   const ai = new GoogleGenAI({ apiKey });
 
   // 1. Handle Image Transformation first (if photo exists)
@@ -41,17 +42,19 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
   }
 
   // 2. Construct the Gemini Prompt
+  // Using Flash instead of Pro to avoid quota issues shown in the console logs
   const prompt = `Write a magical 10-page adventure for a ${info.gender} named ${info.name}. 
   The theme is 'The Starry Key Quest'.
   IMPORTANT: Use the placeholder '{NAME}' whenever referring to the child.
-  Ensure the story includes exactly 10 pages and 2 space-related educational facts.`;
+  Ensure the story includes exactly 10 pages and 2 space-related educational facts.
+  The tone should be whimsical, enchanting, and suitable for a 5-year-old.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Upgraded to Pro for better instruction following
+      model: 'gemini-3-flash-preview', // Switched from Pro to Flash to resolve 429 quota limits
       contents: prompt,
       config: {
-        systemInstruction: "You are a world-class children's book author. You write whimsical, age-appropriate stories and return them in structured JSON format.",
+        systemInstruction: "You are a world-class children's book author. You write whimsical, age-appropriate stories and return them in structured JSON format. Output MUST be valid JSON.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -63,8 +66,8 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
                 type: Type.OBJECT,
                 properties: {
                   pageNumber: { type: Type.INTEGER },
-                  content: { type: Type.STRING, description: "1-3 sentences of story text." },
-                  illustrationPrompt: { type: Type.STRING, description: "A visual description of the scene." }
+                  content: { type: Type.STRING, description: "1-3 whimsical sentences of story text." },
+                  illustrationPrompt: { type: Type.STRING, description: "A detailed visual description for a 3D Pixar-style artist." }
                 },
                 required: ["pageNumber", "content", "illustrationPrompt"]
               },
@@ -92,23 +95,23 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
   } catch (error: any) {
     console.error("Gemini Story Generation Error Detail:", error);
     
-    // Provide a more descriptive error if possible
+    // Provide a more descriptive error based on the status code seen in the logs
     if (error.message?.includes('429')) {
-      throw new Error("Too many requests! Please wait a moment before trying again.");
-    } else if (error.message?.includes('400')) {
-      throw new Error("Invalid request. Please check the child's name and try again.");
+      throw new Error("The magical ink is currently in high demand! Please try again in 60 seconds (API Quota limit).");
+    } else if (error.message?.includes('403')) {
+      throw new Error("Access denied. Please check your API key permissions.");
     }
     
-    throw new Error("The magical ink dried up! Please check your internet or try a shorter name.");
+    throw new Error("The magical ink dried up! Please try a shorter name or wait a moment.");
   }
 }
 
 export async function getChatResponse(message: string) {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const chat = ai.chats.create({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash-preview', // Consistency in using the Flash model
     config: {
-      systemInstruction: "You are 'Magic Mike', a helpful children's book assistant. Keep responses brief and magical! ✨",
+      systemInstruction: "You are 'Magic Mike', a helpful children's book assistant. Keep responses brief, encouraging, and magical! ✨",
     },
   });
 
