@@ -22,33 +22,32 @@ export default function App() {
 
   const handleStart = () => setState('form');
   
-  const handleFormSubmit = async (info: ChildInfo) => {
+  const handleFormSubmit = async (info: ChildInfo, theme: string) => {
     setState('loading');
     setError(null);
-    
     try {
-      const result = await createStoryBookAPI(info);
-      setChildInfo({ ...info, magicAvatar: (result as any).magicAvatar });
+      const result = await createStoryBookAPI(info, theme, 3);
+      setChildInfo(info);
       setStory(result);
       setState('preview');
     } catch (err: any) {
-      console.error("Backend Process Error:", err);
-      setError(err.message || "Something went wrong with the magic. Please try again!");
+      setError(err.message || "The magical ink dried up!");
       setState('form');
     }
   };
 
-  const handleReset = () => {
-    setStory(null);
-    setChildInfo(null);
-    setState('home');
-    setShowSuccess(false);
-  };
-
-  const handleCheckoutSuccess = () => {
-    setShowSuccess(true);
-    setState('home');
-    setTimeout(() => setShowSuccess(false), 5000);
+  const handleTierSelected = async (pagesCount: number) => {
+    if (!childInfo || !story) return;
+    setState('loading');
+    try {
+      const fullStory = await createStoryBookAPI(childInfo, story.theme, pagesCount);
+      setStory(fullStory);
+      setState('preview'); // Show the updated book with full pages
+      // In a real app, this would then lead to Checkout
+    } catch (err: any) {
+      setError(err.message);
+      setState('pricing');
+    }
   };
 
   const handleNavigate = (page: 'home' | 'how-it-works' | 'pricing') => {
@@ -69,19 +68,14 @@ export default function App() {
         )}
 
         {state === 'home' && <Hero onStart={handleStart} />}
-        
         {state === 'how-it-works' && <HowItWorks onStart={handleStart} />}
-        
-        {state === 'pricing' && <Pricing onStart={handleStart} />}
+        {state === 'pricing' && (
+          <Pricing onStart={() => setState('form')} onTierSelect={handleTierSelected} />
+        )}
 
         {state === 'form' && (
           <div className="space-y-4">
-            {error && (
-              <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-3xl flex items-center justify-center gap-3 font-bold">
-                <AlertCircle className="w-5 h-5" />
-                {error}
-              </div>
-            )}
+            {error && <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-3xl flex items-center justify-center gap-3 font-bold"><AlertCircle className="w-5 h-5" />{error}</div>}
             <StoryForm onSubmit={handleFormSubmit} onBack={() => setState('home')} />
           </div>
         )}
@@ -89,20 +83,11 @@ export default function App() {
         {state === 'loading' && <Loader />}
         
         {state === 'preview' && story && childInfo && (
-          <StoryPreview 
-            book={story} 
-            child={childInfo} 
-            onReset={handleReset} 
-            onCheckout={() => setState('checkout')}
-          />
+          <StoryPreview book={story} child={childInfo} onReset={() => setState('home')} onCheckout={() => setState('pricing')} />
         )}
 
         {state === 'checkout' && childInfo && (
-          <Checkout 
-            childName={childInfo.name} 
-            onBack={() => setState('preview')} 
-            onSuccess={handleCheckoutSuccess} 
-          />
+          <Checkout childName={childInfo.name} onBack={() => setState('preview')} onSuccess={() => { setShowSuccess(true); setState('home'); }} />
         )}
       </div>
       <ChatBot />

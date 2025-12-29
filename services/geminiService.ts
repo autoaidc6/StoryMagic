@@ -1,20 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ChildInfo, StoryBook } from "../types";
-
-/**
- * MOCK REPLICATE API CALL
- */
-async function transformPhotoToPixar(photoData: string): Promise<string> {
-  try {
-    console.log("Starting Pixar transformation logic...");
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}&backgroundColor=b6e3f4&style=circle`;
-  } catch (error) {
-    console.error("Transformation Error:", error);
-    throw new Error("Failed to transform photo.");
-  }
-}
+import { ChildInfo, StoryBook, ImageSize } from "../types";
 
 const SYSTEM_INSTRUCTION = `You are the Creative Director and Lead Writer for "StoryMagic," a platform that creates personalized 3D-animated children's eBooks. Your specialty is the "Modern Pixar/Disney 3D" aesthetic.
 
@@ -28,7 +14,6 @@ Every visual_prompt must adhere to these:
 
 # STORYTELLING RULES
 - Tone: Whimsical, heartwarming, and empowering.
-- Structure: Always provide a 10-page story outline.
 - Variables: Always wrap the child's name in {{child_name}} for programmatic replacement.
 
 # OUTPUT FORMAT (STRICT)
@@ -48,24 +33,15 @@ Respond ONLY in JSON format:
 - Never include human-made text inside visual prompts.
 - Maintain character consistency by describing core features in every visual_prompt.`;
 
-export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
+export async function createStoryBookAPI(info: ChildInfo, theme: string, pageCount: number = 3): Promise<StoryBook> {
   const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("API Key is missing.");
 
   const ai = new GoogleGenAI({ apiKey });
 
-  let magicAvatar = info.magicAvatar;
-  if (info.photo && !magicAvatar) {
-    try {
-      magicAvatar = await transformPhotoToPixar(info.photo);
-    } catch (e) {
-      console.warn("Avatar transformation failed", e);
-    }
-  }
-
-  const prompt = `Create a 10-page adventure for a ${info.gender} named {{child_name}}. 
-  Theme: 'The Starry Key Quest'.
-  Ensure the story incorporates 2 educational space facts seamlessly.`;
+  const prompt = `Create a ${pageCount}-page adventure for a ${info.gender} named {{child_name}}. 
+  Theme: '${theme}'.
+  Ensure the story incorporates 2 educational facts related to the theme.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -89,8 +65,8 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
                 },
                 required: ["page", "text", "visual_prompt"]
               },
-              minItems: 10,
-              maxItems: 10
+              minItems: pageCount,
+              maxItems: pageCount
             }
           },
           required: ["title", "pages"]
@@ -99,21 +75,48 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
     });
 
     if (!response.text) throw new Error("Empty response");
-
     const cleanJson = response.text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
     const storyData = JSON.parse(cleanJson);
 
-    return {
-      ...storyData,
-      magicAvatar: magicAvatar 
-    } as StoryBook & { magicAvatar: string };
-
+    return { ...storyData, theme } as StoryBook;
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message?.includes('429')) {
-      throw new Error("Magic limit reached! Please try again in 60 seconds.");
+    throw new Error(error.message?.includes('429') ? "Magic limit reached!" : "The magical ink dried up!");
+  }
+}
+
+export async function generatePageImageAPI(visualPrompt: string, size: ImageSize): Promise<string> {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("Please select your own API Key via 'Unlock Pro Magic' in the header first.");
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: {
+        parts: [{ text: `${visualPrompt}. Modern Pixar 3D style, 8k resolution, cinematic lighting, vibrant colors.` }],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "16:9",
+          imageSize: size
+        }
+      },
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
     }
-    throw new Error("The magical ink dried up! Please try again.");
+    throw new Error("No image data returned from model.");
+  } catch (error: any) {
+    if (error.message?.includes("Requested entity was not found")) {
+       // Potential race condition or invalid key, reset or alert
+       throw new Error("API Key issue. Please re-select your key.");
+    }
+    throw error;
   }
 }
 
@@ -125,7 +128,6 @@ export async function getChatResponse(message: string) {
       systemInstruction: "You are 'Magic Mike', a helpful children's book assistant. Keep responses brief and magical! ✨",
     },
   });
-
   const response = await chat.sendMessage({ message });
   return response.text || "I'm thinking... ✨";
 }

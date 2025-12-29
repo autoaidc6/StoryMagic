@@ -11,12 +11,16 @@ export interface StoryPage {
   text: string;
   visual_prompt: string;
   imageUrl?: string;
+  isGeneratingImage?: boolean;
 }
 
 export interface StoryBook {
   title: string;
   pages: StoryPage[];
+  theme: string;
   sources?: { uri: string; title: string }[];
 }
 
-export type AppState = 'home' | 'form' | 'loading' | 'preview' | 'checkout' | 'how-it-works' | 'pricing';
+export type ImageSize = '1K' | '2K' | '4K';
+
+export type AppState = 'home' | 'form' | 'loading' | 'preview' | 'checkout' | 'how-it-works' | 'pricing' | 'full-generation';
