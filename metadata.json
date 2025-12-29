@@ -1,0 +1,7 @@
+{
+  "name": "StoryMagic",
+  "description": "Create whimsical, personalized children's books with AI-powered storytelling and grounding.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
