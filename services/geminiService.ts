@@ -5,21 +5,12 @@ import { ChildInfo, StoryBook } from "../types";
 /**
  * MOCK REPLICATE API CALL
  * This is where you would integrate the Pixar-style face swap.
- * You'd typically use a model like 'tencentarc/photomaker' or 'stability-ai/sdxl'
  */
 async function transformPhotoToPixar(photoData: string): Promise<string> {
   try {
     console.log("Starting Pixar transformation logic...");
-    
-    // --- REPLICATE INTEGRATION PLACEHOLDER ---
-    // const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-    // const output = await replicate.run("tencentarc/photomaker-v2:...", { input: { image: photoData, prompt: "a 3d pixar style animated character..." } });
-    // return output[0];
-    // ------------------------------------------
-
     // Simulating API latency for the "Magic" effect
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
     // Returning a high-quality mock for now
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}&backgroundColor=b6e3f4&style=circle`;
   } catch (error) {
@@ -32,44 +23,35 @@ async function transformPhotoToPixar(photoData: string): Promise<string> {
  * Logic for generating the 10-page story and character transformation.
  */
 export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
-  // Always create a fresh instance with process.env.API_KEY before calling the model
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please ensure your environment is configured correctly.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   // 1. Handle Image Transformation first (if photo exists)
   let magicAvatar = info.magicAvatar;
   if (info.photo && !magicAvatar) {
-    magicAvatar = await transformPhotoToPixar(info.photo);
+    try {
+      magicAvatar = await transformPhotoToPixar(info.photo);
+    } catch (e) {
+      console.warn("Avatar transformation failed, continuing without it.", e);
+    }
   }
 
-  // 2. Construct the Gemini Prompt for 10 pages
-  const prompt = `
-    Role: Professional Children's Book Author.
-    Task: Write a 10-page adventure for a ${info.gender} named ${info.name}.
-    Theme: 'The Starry Key Quest'.
-    Requirement: Use the token '{NAME}' exactly where the child's name should appear.
-    
-    Format: Return ONLY a JSON object:
-    {
-      "title": "A catchy title using {NAME}",
-      "pages": [
-        {
-          "pageNumber": 1,
-          "content": "Max 3 whimsical sentences.",
-          "illustrationPrompt": "A descriptive scene for a Pixar-style 3D artist."
-        },
-        ... (exactly 10 pages)
-      ]
-    }
-    
-    Include 2 space-related educational facts grounded in real science within the story flow.
-  `;
+  // 2. Construct the Gemini Prompt
+  const prompt = `Write a magical 10-page adventure for a ${info.gender} named ${info.name}. 
+  The theme is 'The Starry Key Quest'.
+  IMPORTANT: Use the placeholder '{NAME}' whenever referring to the child.
+  Ensure the story includes exactly 10 pages and 2 space-related educational facts.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview', // Upgraded to Pro for better instruction following
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }],
+        systemInstruction: "You are a world-class children's book author. You write whimsical, age-appropriate stories and return them in structured JSON format.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -81,11 +63,13 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
                 type: Type.OBJECT,
                 properties: {
                   pageNumber: { type: Type.INTEGER },
-                  content: { type: Type.STRING },
-                  illustrationPrompt: { type: Type.STRING }
+                  content: { type: Type.STRING, description: "1-3 sentences of story text." },
+                  illustrationPrompt: { type: Type.STRING, description: "A visual description of the scene." }
                 },
                 required: ["pageNumber", "content", "illustrationPrompt"]
-              }
+              },
+              minItems: 10,
+              maxItems: 10
             }
           },
           required: ["title", "pages"]
@@ -93,42 +77,41 @@ export async function createStoryBookAPI(info: ChildInfo): Promise<StoryBook> {
       }
     });
 
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const sources = groundingChunks?.map((chunk: any) => {
-      if (chunk.web) return { uri: chunk.web.uri, title: chunk.web.title };
-      return null;
-    }).filter((s: any): s is { uri: string; title: string } => !!s && !!s.uri) || [];
+    if (!response.text) {
+      throw new Error("The model returned an empty response.");
+    }
 
-    // Correctly using response.text property (not a function)
-    const text = response.text || '{}';
-    const cleanJson = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+    const cleanJson = response.text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
     const storyData = JSON.parse(cleanJson);
 
     return {
       ...storyData,
-      sources,
-      // Pass back the transformed avatar
       magicAvatar: magicAvatar 
     } as StoryBook & { magicAvatar: string };
 
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    throw new Error("The magical ink dried up! Please try again in a moment.");
+  } catch (error: any) {
+    console.error("Gemini Story Generation Error Detail:", error);
+    
+    // Provide a more descriptive error if possible
+    if (error.message?.includes('429')) {
+      throw new Error("Too many requests! Please wait a moment before trying again.");
+    } else if (error.message?.includes('400')) {
+      throw new Error("Invalid request. Please check the child's name and try again.");
+    }
+    
+    throw new Error("The magical ink dried up! Please check your internet or try a shorter name.");
   }
 }
 
 export async function getChatResponse(message: string) {
-  // Always create a fresh instance with process.env.API_KEY before calling the model
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const chat = ai.chats.create({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     config: {
-      systemInstruction: "You are 'Magic Mike', a helpful children's book assistant.",
+      systemInstruction: "You are 'Magic Mike', a helpful children's book assistant. Keep responses brief and magical! ✨",
     },
   });
 
-  // Sending message to the chat session
   const response = await chat.sendMessage({ message });
-  // Correctly using response.text property (not a function)
   return response.text || "I'm thinking... ✨";
 }
