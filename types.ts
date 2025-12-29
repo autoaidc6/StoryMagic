@@ -3,6 +3,7 @@ export interface ChildInfo {
   name: string;
   gender: 'boy' | 'girl' | 'other';
   photo: string | null;
+  magicAvatar?: string;
 }
 
 export interface StoryPage {
@@ -18,4 +19,4 @@ export interface StoryBook {
   sources?: { uri: string; title: string }[];
 }
 
-export type AppState = 'home' | 'form' | 'loading' | 'preview';
+export type AppState = 'home' | 'form' | 'loading' | 'preview' | 'checkout';

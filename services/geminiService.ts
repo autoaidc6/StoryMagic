@@ -10,12 +10,14 @@ const getAI = () => {
 
 export async function generatePersonalizedStory(info: ChildInfo): Promise<StoryBook> {
   const ai = getAI();
+  // Using a placeholder {NAME} to allow for client-side dynamic injection as requested
   const prompt = `Create a magical 10-page children's adventure story for a ${info.gender} named ${info.name}. 
   The theme should be 'The Starry Key Quest'. 
+  Use the placeholder '{NAME}' whenever referring to the child in the story text.
   Include 2-3 fun, real-world educational facts about stars or space integrated into the story.
   
   Return a JSON object with:
-  - title: A catchy book title.
+  - title: A catchy book title (can contain {NAME}).
   - pages: Array of 10 objects, each with 'pageNumber', 'content' (max 3 sentences), and 'illustrationPrompt' (a descriptive scene for an illustrator).`;
 
   const response = await ai.models.generateContent({
