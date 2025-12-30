@@ -9,19 +9,28 @@ import { ChatBot } from './components/ChatBot';
 import { Checkout } from './components/Checkout';
 import { HowItWorks } from './components/HowItWorks';
 import { Pricing } from './components/Pricing';
-import { AppState, ChildInfo, StoryBook, StoryPage } from './types';
+import { Auth } from './components/Auth';
+import { AppState, ChildInfo, StoryBook, StoryPage, User } from './types';
 import { createStoryBookAPI, generatePageImageAPI } from './services/geminiService';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [state, setState] = useState<AppState>('home');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [childInfo, setChildInfo] = useState<ChildInfo | null>(null);
   const [story, setStory] = useState<StoryBook | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
+  const [selectedTierPrice, setSelectedTierPrice] = useState("$24.99");
 
-  const handleStart = () => setState('form');
+  const handleStart = () => {
+    if (!currentUser) {
+      setState('auth');
+    } else {
+      setState('form');
+    }
+  };
   
   const handleFormSubmit = async (info: ChildInfo, theme: string) => {
     setState('loading');
@@ -38,12 +47,11 @@ export default function App() {
       const illustratedPages = await Promise.all(
         storyResult.pages.map(async (page: StoryPage) => {
           try {
-            // Attempt to auto-generate 1K preview images if possible
             const imageUrl = await generatePageImageAPI(page.visual_prompt, '1K');
             return { ...page, imageUrl };
           } catch (e) {
             console.warn(`Auto-image gen failed for page ${page.page}:`, e);
-            return page; // Fallback to text-only if image fails
+            return page; 
           }
         })
       );
@@ -59,14 +67,28 @@ export default function App() {
     }
   };
 
-  const handleTierSelected = async (pagesCount: number) => {
+  const handleTierSelected = (pagesCount: number) => {
+    // Set price based on pages
+    const prices: Record<number, string> = { 5: "$9.99", 10: "$24.99", 20: "$39.99" };
+    setSelectedTierPrice(prices[pagesCount]);
+    
+    if (!currentUser) {
+      setState('auth');
+      return;
+    }
+    
+    // Process full generation
+    processFullGeneration(pagesCount);
+  };
+
+  const processFullGeneration = async (pagesCount: number) => {
     if (!childInfo || !story) return;
     setState('loading');
     setLoadingStatus(`Expanding to ${pagesCount} pages...`);
     try {
       const fullStory = await createStoryBookAPI(childInfo, story.theme, pagesCount);
       setStory(fullStory);
-      setState('preview');
+      setState('checkout');
     } catch (err: any) {
       setError(err.message);
       setState('pricing');
@@ -75,13 +97,28 @@ export default function App() {
     }
   };
 
-  const handleNavigate = (page: 'home' | 'how-it-works' | 'pricing') => {
+  const handleNavigate = (page: AppState) => {
     setError(null);
     setState(page);
   };
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setState('home');
+  };
+
+  const handleAuthSuccess = (user: User) => {
+    setCurrentUser(user);
+    // If user was coming from form or pricing, redirect them back
+    if (childInfo) {
+      setState('preview');
+    } else {
+      setState('form');
+    }
+  };
+
   return (
-    <Layout onNavigate={handleNavigate}>
+    <Layout user={currentUser} onNavigate={handleNavigate as any} onLogout={handleLogout}>
       <div className="animate-in fade-in duration-1000 relative min-h-[60vh]">
         {showSuccess && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4">
@@ -95,7 +132,11 @@ export default function App() {
         {state === 'home' && <Hero onStart={handleStart} />}
         {state === 'how-it-works' && <HowItWorks onStart={handleStart} />}
         {state === 'pricing' && (
-          <Pricing onStart={() => setState('form')} onTierSelect={handleTierSelected} />
+          <Pricing onStart={handleStart} onTierSelect={handleTierSelected} />
+        )}
+
+        {state === 'auth' && (
+          <Auth onSuccess={handleAuthSuccess} onBack={() => setState('home')} />
         )}
 
         {state === 'form' && (
@@ -112,7 +153,12 @@ export default function App() {
         )}
 
         {state === 'checkout' && childInfo && (
-          <Checkout childName={childInfo.name} onBack={() => setState('preview')} onSuccess={() => { setShowSuccess(true); setState('home'); }} />
+          <Checkout 
+            childName={childInfo.name} 
+            tierPrice={selectedTierPrice}
+            onBack={() => setState('preview')} 
+            onSuccess={() => { setShowSuccess(true); setState('home'); }} 
+          />
         )}
       </div>
       <ChatBot />
