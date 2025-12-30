@@ -37,6 +37,7 @@ export async function createStoryBookAPI(info: ChildInfo, theme: string, pageCou
   const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("API Key is missing.");
 
+  // Using fresh instance for reliability
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `Create a ${pageCount}-page adventure for a ${info.gender} named {{child_name}}. 
@@ -81,15 +82,18 @@ export async function createStoryBookAPI(info: ChildInfo, theme: string, pageCou
     return { ...storyData, theme } as StoryBook;
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    throw new Error(error.message?.includes('429') ? "Magic limit reached!" : "The magical ink dried up!");
+    if (error.message?.includes('429')) {
+      throw new Error("QUOTA_EXCEEDED: The magic ink is temporarily dry. Please select a paid API key or wait a moment.");
+    }
+    throw new Error(error.message || "The magical ink dried up!");
   }
 }
 
 export async function generatePageImageAPI(visualPrompt: string, size: ImageSize): Promise<string> {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("Please select your own API Key via 'Unlock Pro Magic' in the header first.");
-
-  const ai = new GoogleGenAI({ apiKey });
+  
+  // Mandatory fresh instance per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
@@ -112,11 +116,17 @@ export async function generatePageImageAPI(visualPrompt: string, size: ImageSize
     }
     throw new Error("No image data returned from model.");
   } catch (error: any) {
-    if (error.message?.includes("Requested entity was not found")) {
-       // Potential race condition or invalid key, reset or alert
-       throw new Error("API Key issue. Please re-select your key.");
+    console.error("Image Gen Error:", error);
+    
+    if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED")) {
+      throw new Error("QUOTA_EXCEEDED: High-quality image generation requires a paid API key. Please select a key from a paid GCP project.");
     }
-    throw error;
+
+    if (error.message?.includes("Requested entity was not found")) {
+       throw new Error("REAUTH_REQUIRED: API Key issue. Please re-select your key via 'Unlock Pro Magic'.");
+    }
+    
+    throw new Error(error.message || "Failed to generate image.");
   }
 }
 

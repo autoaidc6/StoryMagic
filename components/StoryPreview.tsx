@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Sparkles, ShoppingCart, Wand2, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Sparkles, ShoppingCart, Wand2, Image as ImageIcon, Loader2, AlertCircle, Key } from 'lucide-react';
 import { StoryBook, ChildInfo, ImageSize } from '../types';
 import { generatePageImageAPI } from '../services/geminiService';
 
@@ -14,7 +14,7 @@ interface StoryPreviewProps {
 export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset, onCheckout }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [pages, setPages] = useState(book.pages);
-  const [genError, setGenError] = useState<string | null>(null);
+  const [genError, setGenError] = useState<{ message: string; type: string } | null>(null);
 
   const nextPage = () => currentPage < pages.length && setCurrentPage(currentPage + 1);
   const prevPage = () => currentPage > 0 && setCurrentPage(currentPage - 1);
@@ -22,17 +22,31 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
 
   const injectName = (text: string) => text?.replace(/{{child_name}}/g, child.name) || "";
 
+  const handleSelectKey = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      setGenError(null);
+    }
+  };
+
   const handleGenerateImage = async (pageIdx: number, size: ImageSize) => {
     setGenError(null);
     const newPages = [...pages];
     newPages[pageIdx].isGeneratingImage = true;
-    setPages(newPages);
+    setPages([...newPages]);
 
     try {
       const url = await generatePageImageAPI(newPages[pageIdx].visual_prompt, size);
       newPages[pageIdx].imageUrl = url;
     } catch (err: any) {
-      setGenError(err.message || "Failed to generate image.");
+      let type = 'general';
+      if (err.message.includes('QUOTA_EXCEEDED')) type = 'quota';
+      if (err.message.includes('REAUTH_REQUIRED')) type = 'auth';
+      
+      setGenError({ 
+        message: err.message.replace(/QUOTA_EXCEEDED: |REAUTH_REQUIRED: /, ''), 
+        type 
+      });
     } finally {
       newPages[pageIdx].isGeneratingImage = false;
       setPages([...newPages]);
@@ -55,8 +69,29 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
       </div>
 
       {genError && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 text-sm font-bold border border-red-100">
-          <AlertCircle className="w-5 h-5" /> {genError}
+        <div className="bg-red-50 border border-red-100 p-6 rounded-3xl flex flex-col md:flex-row items-center gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="bg-red-100 p-3 rounded-2xl">
+            <AlertCircle className="w-6 h-6 text-red-600" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <p className="text-red-800 font-bold">The magic wand stuttered!</p>
+            <p className="text-red-600 text-sm leading-relaxed">{genError.message}</p>
+          </div>
+          {(genError.type === 'quota' || genError.type === 'auth') && (
+            <button 
+              onClick={handleSelectKey}
+              className="px-6 py-3 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition-all shadow-lg flex items-center gap-2 shrink-0"
+            >
+              <Key className="w-4 h-4" />
+              Select Paid API Key
+            </button>
+          )}
+          <button 
+            onClick={() => setGenError(null)}
+            className="text-red-400 hover:text-red-600 font-bold text-xs uppercase tracking-widest px-2"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -78,14 +113,14 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
                 </div>
              ) : (
                 <div className="w-full h-full flex flex-col gap-4">
-                   <div className="flex-1 bg-white rounded-[30px] shadow-sm overflow-hidden border-4 border-white relative flex items-center justify-center">
+                   <div className="flex-1 bg-white rounded-[30px] shadow-sm overflow-hidden border-4 border-white relative flex items-center justify-center min-h-[300px]">
                       {pages[currentPage - 1].isGeneratingImage ? (
                         <div className="flex flex-col items-center gap-4 text-indigo-400 animate-pulse p-12 text-center">
                           <Loader2 className="w-12 h-12 animate-spin" />
                           <p className="font-bold text-sm">Mixing Pro Pixels...<br/><span className="text-[10px] font-normal uppercase tracking-widest">Nano Banana Pro 3.1</span></p>
                         </div>
                       ) : pages[currentPage - 1].imageUrl ? (
-                        <img src={pages[currentPage - 1].imageUrl} className="w-full h-full object-cover" />
+                        <img src={pages[currentPage - 1].imageUrl} className="w-full h-full object-cover animate-in fade-in duration-700" />
                       ) : (
                         <div className="flex flex-col items-center gap-4 text-slate-300 p-12 text-center">
                           <ImageIcon className="w-16 h-16 opacity-50" />
@@ -95,14 +130,14 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
                    </div>
                    
                    {!pages[currentPage-1].imageUrl && !pages[currentPage-1].isGeneratingImage && (
-                     <div className="flex flex-col gap-2">
+                     <div className="flex flex-col gap-2 animate-in slide-in-from-bottom-2">
                         <p className="text-[10px] text-slate-400 text-center uppercase font-bold tracking-widest">Generate with Pro Magic</p>
                         <div className="grid grid-cols-3 gap-2">
                           {(['1K', '2K', '4K'] as ImageSize[]).map(size => (
                             <button 
                               key={size}
                               onClick={() => handleGenerateImage(currentPage - 1, size)}
-                              className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-md flex items-center justify-center gap-1"
+                              className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-md flex items-center justify-center gap-1 active:scale-95 transition-transform"
                             >
                               <Wand2 className="w-3 h-3" /> {size}
                             </button>
