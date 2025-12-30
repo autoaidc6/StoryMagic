@@ -2,7 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Star, Book } from 'lucide-react';
 
-export const Loader: React.FC = () => {
+interface LoaderProps {
+  customStatus?: string | null;
+}
+
+export const Loader: React.FC<LoaderProps> = ({ customStatus }) => {
   const [step, setStep] = useState(0);
   const steps = [
     "Opening the library of dreams...",
@@ -14,11 +18,12 @@ export const Loader: React.FC = () => {
   ];
 
   useEffect(() => {
+    if (customStatus) return; // Use custom cycle if no explicit status
     const interval = setInterval(() => {
       setStep((prev) => (prev + 1) % steps.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, [steps.length]);
+  }, [steps.length, customStatus]);
 
   return (
     <div className="max-w-md mx-auto py-20 text-center space-y-8">
@@ -31,19 +36,19 @@ export const Loader: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-2xl font-bubblegum text-indigo-700 transition-all duration-500">
-          {steps[step]}
+        <h3 className="text-2xl font-bubblegum text-indigo-700 transition-all duration-500 min-h-[2em] flex items-center justify-center">
+          {customStatus || steps[step]}
         </h3>
         <div className="w-full h-3 bg-indigo-100 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-indigo-500 transition-all duration-1000 ease-in-out rounded-full"
-            style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+            className="h-full bg-indigo-500 transition-all duration-1000 ease-in-out rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+            style={{ width: customStatus ? '75%' : `${((step + 1) / steps.length) * 100}%` }}
           />
         </div>
       </div>
       
       <p className="text-slate-400 text-sm animate-pulse italic">
-        "One magic minute equals a thousand years of story..."
+        {customStatus ? "Harnessing Nano Banana Pro 3.1..." : '"One magic minute equals a thousand years of story..."'}
       </p>
     </div>
   );

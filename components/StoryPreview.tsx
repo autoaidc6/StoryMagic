@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, Sparkles, ShoppingCart, Wand2, Image as ImageIcon, Loader2, AlertCircle, Key } from 'lucide-react';
 import { StoryBook, ChildInfo, ImageSize } from '../types';
 import { generatePageImageAPI } from '../services/geminiService';
@@ -15,6 +15,11 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
   const [currentPage, setCurrentPage] = useState(0);
   const [pages, setPages] = useState(book.pages);
   const [genError, setGenError] = useState<{ message: string; type: string } | null>(null);
+
+  // Sync state if props update (e.g. after full book generation or auto-illustrate)
+  useEffect(() => {
+    setPages(book.pages);
+  }, [book.pages]);
 
   const nextPage = () => currentPage < pages.length && setCurrentPage(currentPage + 1);
   const prevPage = () => currentPage > 0 && setCurrentPage(currentPage - 1);
@@ -58,7 +63,7 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ book, child, onReset
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bubblegum text-indigo-600">{injectName(book.title)}</h2>
-          <p className="text-slate-400 text-sm">Preview Phase (3 Pages Generated)</p>
+          <p className="text-slate-400 text-sm">Adventure Preview Phase</p>
         </div>
         <div className="flex gap-2">
           <button onClick={onReset} className="p-3 bg-white rounded-xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><RefreshCw className="w-5 h-5" /></button>
